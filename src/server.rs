@@ -1,3 +1,7 @@
+// Modified by krylovim, 2026: explicit project search and safe number resolution.
+mod search;
+use search::ProjectListParams;
+
 use std::{
     future::Future,
     sync::{Arc, Mutex},
@@ -88,10 +92,13 @@ impl BugboardServer {
 
     #[tool(
         name = "project_list",
-        description = "List visible 1C bugboard projects as human-readable summaries."
+        description = "Find products by literal query over code, title or abbreviation. Returns stable project_code and session-local project_handle; multiple matches are candidates, never an automatic selection. First page only."
     )]
-    async fn project_list(&self, Parameters(params): Parameters<ListParams>) -> CallToolResult {
-        tool_result(self.project_list_value(params.limit)).await
+    async fn project_list(
+        &self,
+        Parameters(params): Parameters<ProjectListParams>,
+    ) -> CallToolResult {
+        tool_result(self.project_catalog_value(params)).await
     }
 
     #[tool(
@@ -168,7 +175,7 @@ impl BugboardServer {
 
     #[tool(
         name = "bug_search",
-        description = "Search bugboard bugs by exact bug number or full-text query."
+        description = "Search bugs with optional stable project_code or session-local project_handle. Explicit text mode uses literal title OR description CONTAINS, with project filtering before limit. number is exact (digits/hyphens); auto detects numbers. Without new arguments, legacy text RPC is preserved. Inspect coverage and ambiguous; no global current project or pagination."
     )]
     async fn bug_search(&self, Parameters(params): Parameters<BugSearchParams>) -> CallToolResult {
         tool_result(self.bug_search_value(params)).await
@@ -342,25 +349,6 @@ impl BugboardServer {
         }))
     }
 
-    async fn project_list_value(&self, limit: Option<u32>) -> Result<Value, ToolFailure> {
-        let limit = normalize_limit(limit)?;
-        let client = self.client()?;
-        let parsed = client
-            .execute_dynamic_list("project_list", bugboard::project_list_request(limit)?)
-            .await?;
-        let projects = bugboard::decode_project_rows(&parsed)
-            .map_err(|error| ToolFailure::bugboard_changed("project_list", error))?
-            .iter()
-            .map(|row| normalize_project_row(self, row))
-            .collect::<Result<Vec<_>, _>>()?;
-
-        Ok(json!({
-            "projects": projects,
-            "count": projects.len(),
-            "limit": limit,
-        }))
-    }
-
     async fn project_get_versions_value(
         &self,
         params: ProjectVersionsParams,
@@ -527,53 +515,6 @@ impl BugboardServer {
             .await?;
         bugboard::decode_project_references(&result)
             .map_err(|error| ToolFailure::bugboard_changed("project_list_subscribed", error))
-    }
-
-    async fn bug_search_value(&self, params: BugSearchParams) -> Result<Value, ToolFailure> {
-        let query = params.query.trim();
-        if query.is_empty() {
-            return Err(ToolFailure::new(
-                "invalid_arguments",
-                "Set a non-empty query.",
-                json!({"field": "query"}),
-            ));
-        }
-        let limit = normalize_limit(params.limit)?;
-        let client = self.client()?;
-        if is_bug_number(query) {
-            let refs = bugboard::decode_bug_rows(
-                &client
-                    .execute_dynamic_list("bug_search", bugboard::bug_lookup_request(query)?)
-                    .await?,
-            )
-            .map_err(|error| ToolFailure::bugboard_changed("bug_search", error))?
-            .into_iter()
-            .filter(|row| row.number.as_deref() == Some(query))
-            .map(|row| row.reference)
-            .collect();
-
-            return self
-                .bug_references_response(
-                    client,
-                    refs,
-                    limit,
-                    json!({"query": query, "mode": "bug_lookup", "full_text": false}),
-                )
-                .await;
-        }
-
-        let result = client
-            .execute_module_call("bug_search", bugboard::bug_full_text_search_request(query)?)
-            .await?;
-        let refs = bugboard::decode_full_text_bug_references(&result)
-            .map_err(|error| ToolFailure::bugboard_changed("bug_search", error))?;
-        self.bug_references_response(
-            client,
-            refs,
-            limit,
-            json!({"query": query, "mode": "full_text", "full_text": true}),
-        )
-        .await
     }
 
     async fn bug_list_subscribed_value(&self, params: ListParams) -> Result<Value, ToolFailure> {
@@ -899,21 +840,31 @@ impl BugboardServer {
     }
 
     async fn resolve_bug_number(&self, number: &str) -> Result<String, ToolFailure> {
-        if !is_bug_number(number) {
-            return Err(ToolFailure::invalid_arguments(
-                "bug_number must contain only ASCII digits.",
+        let result = self
+            .bug_search_value(BugSearchParams {
+                query: number.to_owned(),
+                limit: Some(2),
+                mode: Some(search::SearchMode::Number),
+                project_code: None,
+                project_handle: None,
+            })
+            .await?;
+        let bugs = result["bugs"]
+            .as_array()
+            .ok_or_else(|| ToolFailure::internal("missing candidates"))?;
+        if result["ambiguous"] == true {
+            return Err(ToolFailure::new(
+                "ambiguous_bug_number",
+                "Several bugs have this number. Search with project_code or use a candidate bug_handle.",
+                result,
             ));
         }
-        let client = self.client()?;
-        let parsed = client
-            .execute_dynamic_list("bug_search", bugboard::bug_lookup_request(number)?)
-            .await?;
-        bugboard::decode_bug_rows(&parsed)
-            .map_err(|error| ToolFailure::bugboard_changed("bug_search", error))?
-            .into_iter()
-            .find(|row| row.number.as_deref() == Some(number))
-            .map(|row| row.reference)
-            .ok_or_else(|| ToolFailure::empty_result(format!("Bug {number} was not found.")))
+        match bugs.first().and_then(|bug| bug["bug_handle"].as_str()) {
+            Some(handle) => self.resolve_ref(HandleKind::Bug, handle),
+            None => Err(ToolFailure::empty_result(format!(
+                "Bug {number} was not found."
+            ))),
+        }
     }
 }
 
@@ -939,6 +890,11 @@ pub(crate) struct VersionGetBugsParams {
 struct BugSearchParams {
     query: String,
     limit: Option<u32>,
+    /// Stable product code, e.g. bp3. Pass scope on every call.
+    project_code: Option<String>,
+    /// Handle from project_list in this MCP session. May accompany the same code.
+    project_handle: Option<String>,
+    mode: Option<search::SearchMode>,
 }
 
 #[derive(Deserialize, JsonSchema)]

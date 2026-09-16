@@ -1,3 +1,4 @@
+// Modified by krylovim, 2026: expose test-only client construction for search regressions.
 use std::time::Duration;
 
 use e1c_element_rpc::{
@@ -21,6 +22,17 @@ pub(crate) struct BugboardClient {
 }
 
 impl BugboardClient {
+    #[cfg(test)]
+    pub(crate) fn for_test(base_url: &str) -> Self {
+        Self::with_base_url(
+            SessionConfig {
+                cookie: "session=test".to_owned(),
+            },
+            base_url,
+        )
+        .unwrap()
+    }
+
     pub(crate) fn new(config: SessionConfig) -> Result<Self, ToolFailure> {
         Self::with_base_url(config, bugboard::BUGBOARD_BASE_URL)
     }
@@ -227,6 +239,11 @@ impl BugboardClient {
             .with_session(&self.session)
             .map_err(|error| ToolFailure::internal(error.to_string()))?;
         let (method, url, headers, body) = request.into_parts();
+        #[cfg(test)]
+        let url = url
+            .strip_prefix(bugboard::BUGBOARD_BASE_URL)
+            .map(|suffix| format!("{}{}", self.base_url.as_str().trim_end_matches('/'), suffix))
+            .unwrap_or(url);
         let method = match method {
             HttpMethod::Get => reqwest::Method::GET,
             HttpMethod::Post => reqwest::Method::POST,

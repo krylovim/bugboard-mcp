@@ -1,3 +1,7 @@
+// Modified by krylovim, 2026: project-scoped search wire API.
+mod search;
+pub use search::*;
+
 use serde_json::{Value, json};
 use std::collections::HashSet;
 

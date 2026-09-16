@@ -1,22 +1,19 @@
-use e1c_element_rpc::bugboard::{self, BugRow, ProjectRow, VersionRow};
+// Modified by krylovim, 2026: recognize hyphenated bug numbers.
+use e1c_element_rpc::bugboard::{self, BugRow, CatalogProject, VersionRow};
 use serde_json::{Value, json};
 
 use crate::{errors::ToolFailure, handles::HandleKind, server::BugboardServer};
 
 pub(crate) fn normalize_project_row(
     server: &BugboardServer,
-    row: &ProjectRow,
+    row: &CatalogProject,
 ) -> Result<Value, ToolFailure> {
     let handle = server.remember_ref(HandleKind::Project, &row.reference)?;
-    let title = row
-        .title
-        .clone()
-        .or_else(|| row.abbreviation.clone())
-        .ok_or_else(|| ToolFailure::bugboard_changed("project_list", "missing project title"))?;
 
     Ok(json!({
         "project_handle": handle,
-        "title": title,
+        "project_code": row.code,
+        "title": row.title,
         "abbreviation": row.abbreviation,
         "updated_at": row.updated_at,
     }))
@@ -52,7 +49,10 @@ pub(crate) fn normalize_bug_row(
 
 pub(crate) fn is_bug_number(value: &str) -> bool {
     let value = value.trim();
-    !value.is_empty() && value.chars().all(|ch| ch.is_ascii_digit())
+    !value.is_empty()
+        && value
+            .split('-')
+            .all(|part| !part.is_empty() && part.chars().all(|ch| ch.is_ascii_digit()))
 }
 
 pub(crate) fn normalize_bug_details(value: Value) -> Result<Value, ToolFailure> {

@@ -1,3 +1,4 @@
+// Modified by krylovim, 2026: catalog normalization contract.
 #[cfg(test)]
 mod tests {
     use crate::{
@@ -15,7 +16,7 @@ mod tests {
         write_safety::{RequestedState, WriteOutcome, WriteSafety, apply_write},
     };
     use e1c_element_rpc::bugboard::{
-        BUG_REFERENCE_TYPE, BugRow, PROJECT_REFERENCE_TYPE, ProjectRow, VERSION_REFERENCE_TYPE,
+        BUG_REFERENCE_TYPE, BugRow, CatalogProject, PROJECT_REFERENCE_TYPE, VERSION_REFERENCE_TYPE,
         VersionRow,
     };
     use serde_json::{Value, json};
@@ -205,19 +206,18 @@ mod tests {
     #[test]
     fn project_row_normalization_returns_human_fields() {
         let server = BugboardServer::new();
-        let row = ProjectRow {
+        let row = CatalogProject {
             reference: "project-ref".to_owned(),
             abbreviation: Some("ERP".to_owned()),
-            title: Some("1C:ERP".to_owned()),
-            deleted: Some(false),
+            title: "1C:ERP".to_owned(),
+            code: "erp".to_owned(),
             updated_at: Some("2026-07-01".to_owned()),
-            group_order: None,
-            order: None,
         };
 
         let project = normalize_project_row(&server, &row).unwrap();
 
         assert_eq!(project["project_handle"], "project-1");
+        assert_eq!(project["project_code"], "erp");
         assert_eq!(project["title"], "1C:ERP");
         assert_eq!(project["abbreviation"], "ERP");
         assert!(!project.to_string().contains("project-ref"));
@@ -431,6 +431,16 @@ mod tests {
             .and_then(Value::as_array)
             .unwrap();
         assert!(search_required.contains(&json!("query")));
+        assert_eq!(search_required.len(), 1);
+        let search_properties = bug_search.input_schema["properties"].as_object().unwrap();
+        for name in ["query", "limit", "mode", "project_code", "project_handle"] {
+            assert!(search_properties.contains_key(name));
+        }
+        let projects = tools
+            .iter()
+            .find(|tool| tool.name == "project_list")
+            .unwrap();
+        assert!(projects.input_schema["properties"].get("query").is_some());
 
         let bug_list_subscribed = tools
             .iter()

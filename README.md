@@ -1,5 +1,8 @@
 # bugboard-mcp
 
+Fork changes by krylovim (2026): restored legacy search and added explicit
+product-scoped content search. Original license and author notices are retained.
+
 `bugboard-mcp` gives an MCP client access to projects, versions, bugs, history,
 subscriptions, and votes in the 1C Bugboard. It uses the browser session you
 already have; it does not collect credentials or automate the browser.
@@ -67,10 +70,58 @@ tools also require `vote_kind`. `project_get_versions`, `project_subscribe`,
 and `project_unsubscribe` require `project_handle`. `version_get_bugs` needs a
 project handle and the exact version title returned by `project_get_versions`.
 
-`bug_list_recent` returns the first page. `bug_search` requires a query:
-ASCII digits select an exact bug number, while other text runs a full-text
-search. Limits range from 1 to 50. Pagination will be added only after its
-request shape is verified.
+`bug_list_recent` returns the first page. List/search limits range from 1 to 50.
+`project_list` accepts optional `query` to find products by literal substring
+of their official title, abbreviation or code. It returns candidates with a
+stable `project_code` and a temporary `project_handle`. A broad query such as
+«Бухгалтерия» must not be resolved by selecting its first result.
+
+For content search in a known product, call `bug_search` with:
+
+```json
+{"query":"НДС","project_code":"bp3","mode":"text","limit":20}
+```
+
+The server applies `project AND (title CONTAINS query OR description CONTAINS
+query)` **before** limiting results. `project_handle` may be used instead of
+`project_code`; if both are supplied they must identify the same product.
+Unknown or ambiguous product codes fail explicitly. Each call supplies its
+own scope; there is no mutable current project shared between tasks.
+
+Modes and compatibility:
+
+| Input | Search behavior |
+| --- | --- |
+| `mode: "text"` | Literal title/description substring, including digit-only text |
+| `mode: "number"` | Exact number; ASCII digit groups with optional single hyphens |
+| `mode: "auto"` | Detect a number, otherwise use title/description substring |
+| Project supplied, mode omitted | Same as `auto`, scoped to that product |
+| No project or mode, digit/hyphen number | Exact number, across visible products |
+| No project or mode, other text | Original full-text RPC, for compatibility |
+
+Old `query`/`limit` calls and result fields remain supported. Exact-number
+search now returns candidates and `ambiguous: true` when it observes multiple
+cards, even with `limit: 1`. `bug_get` and the other number-based read tools
+reject ambiguous numbers with `ambiguous_bug_number`; use a candidate's
+`bug_handle`, or search again with `project_code`. A number is not a globally
+unique bug identifier.
+
+Search results include product identity, number, URL and the applied `filter`.
+`filter.mode` retains `bug_lookup`/`full_text` for old consumers;
+`filter.effective_mode` states the actual `number`, `text` or
+`legacy_full_text` operation. Text results include `matched_fields`, a local
+case-insensitive check against the list snapshot; server collation may differ.
+
+`has_more: true` means an extra matching row was observed by requesting
+`limit + 1`; `false` means no extra row was observed, **not** proof of complete
+results. `coverage.complete` is conservatively false, `coverage.total` is null,
+and cursor pagination is unsupported. The first page, upstream access rules,
+server caps and changing data limit what can be concluded. Literal search is
+not semantic or morphological search. An empty result does not prove that no
+known bug exists, and a fix version does not establish affected versions.
+
+See [the API and acceptance notes](docs/project-scoped-search.md) for the
+boundary with future catalog caching (#2) and the diagnostic skill (#3).
 
 ## Development
 
