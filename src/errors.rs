@@ -1,3 +1,4 @@
+// Modified by krylovim, 2026: safe recovery guidance for rejected sessions.
 use rmcp::model::CallToolResult;
 use serde_json::{Value, json};
 #[derive(Clone, Debug)]
@@ -34,6 +35,14 @@ impl ToolFailure {
 
     pub(crate) fn empty_result(message: impl Into<String>) -> Self {
         Self::new("empty_result", message, json!({}))
+    }
+
+    pub(crate) fn not_authenticated(details: Value) -> Self {
+        Self::new(
+            "not_authenticated",
+            "Bugboard rejected the configured session. Sign in again with the local browser-login helper for the same profile, then restart this MCP connection.",
+            details,
+        )
     }
 
     pub(crate) fn internal(message: impl Into<String>) -> Self {
@@ -85,11 +94,7 @@ pub(crate) fn http_failure(
     parsed: Option<&Value>,
 ) -> ToolFailure {
     if matches!(status, 401 | 403) {
-        return ToolFailure::new(
-            "not_authenticated",
-            "Bugboard rejected the configured session.",
-            json!({"operation": operation, "status": status}),
-        );
+        return ToolFailure::not_authenticated(json!({"operation": operation, "status": status}));
     }
 
     ToolFailure::new(

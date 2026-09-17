@@ -1,7 +1,14 @@
 # Shared local runtime
 
-Deployment checkpoint by krylovim, 2026-09-17. Supersedes the pending deployment
-step in the earlier issue #1 verification report.
+Initial deployment checkpoint by krylovim, 2026-09-17. Supersedes the pending
+deployment step in the earlier issue #1 verification report.
+
+**Updated 2026-09-18:** the active installation now uses runtime `1287b94c76e6`,
+Windows DPAPI profile `work` and the shared Chrome `login.ps1` helper. See the
+[current acceptance and migration checkpoint](followup-verification.md).
+The history below records the first deployment; the installed v2 rollback
+helper now switches both executable and compatible authorization, with db9ac11
+as the previous version. The legacy env is retained only for that rollback.
 
 Fork `main` was fast-forwarded to `db9ac110eb8e40b499ddfcf508d0065052b15659`,
 including the inherited text-search fix exactly once. Upstream PR #2 and its
@@ -44,8 +51,9 @@ is retained as a safety copy but is no longer required by configured launches.
 - Rollback and return were tested against an isolated configuration, including
   preservation of unrelated settings and the session path.
 
-Open tasks still holding an older MCP process need **Restart** for Bugboard in
-the app's MCP settings. They were not force-killed during migration. A new
+Open tasks still holding an older MCP process need a restart. If the app does
+not expose a per-server restart, close and reopen Codex. Processes were not
+force-killed during migration. A new
 configuration entry does not retroactively replace the tool schema in an
 already running task. See the [official MCP setup documentation](https://learn.chatgpt.com/docs/extend/mcp?surface=cli).
 

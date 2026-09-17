@@ -153,9 +153,7 @@ impl BugboardClient {
             .await
             .map_err(|error| ToolFailure::transport(error.to_string()))?;
         if response.url().origin() != self.base_url.origin() {
-            return Err(ToolFailure::new(
-                "not_authenticated",
-                "Bugboard redirected the configured session to authentication.",
+            return Err(ToolFailure::not_authenticated(
                 json!({"operation": "g5_bootstrap"}),
             ));
         }
@@ -189,9 +187,7 @@ impl BugboardClient {
             Ok(version) => Ok(version),
             Err(error) => {
                 if !self.session_is_authenticated().await? {
-                    return Err(ToolFailure::new(
-                        "not_authenticated",
-                        "Bugboard rejected the configured session.",
+                    return Err(ToolFailure::not_authenticated(
                         json!({"operation": "g5_bootstrap"}),
                     ));
                 }
@@ -631,6 +627,78 @@ mod tests {
         assert_eq!(auth_status_count.load(Ordering::Relaxed), 1);
         assert_eq!(ui_count.load(Ordering::Relaxed), 0);
         server.abort();
+    }
+
+    #[tokio::test]
+    async fn session_rejected_after_success_returns_safe_refresh_guidance_without_retry() {
+        for rejected_status in [StatusCode::UNAUTHORIZED, StatusCode::FORBIDDEN] {
+            let calls = Arc::new(AtomicUsize::new(0));
+            let router = Router::new()
+                .route(
+                    "/",
+                    get(|| async { ([("content-type", "text/html")], TEST_SHELL) }),
+                )
+                .route(
+                    "/ui/read",
+                    get({
+                        let calls = Arc::clone(&calls);
+                        move || {
+                            let calls = Arc::clone(&calls);
+                            async move {
+                                if calls.fetch_add(1, Ordering::Relaxed) == 0 {
+                                    (
+                                        StatusCode::OK,
+                                        [("content-type", "application/json")],
+                                        r#"{"ok":true}"#,
+                                    )
+                                } else {
+                                    (
+                                        rejected_status,
+                                        [("content-type", "text/html")],
+                                        "synthetic-sensitive-session=must-not-appear",
+                                    )
+                                }
+                            }
+                        }
+                    }),
+                );
+            let (base_url, server) = spawn_test_server(router).await;
+            let client = BugboardClient::with_base_url(
+                SessionConfig {
+                    cookie: "session=synthetic-secret".into(),
+                },
+                &base_url,
+            )
+            .unwrap();
+            let request = || HttpRequest::get(format!("{base_url}/ui/read")).unwrap();
+            assert_eq!(
+                client.execute("expiry_test", request()).await.unwrap(),
+                json!({"ok":true})
+            );
+            let failure = client
+                .execute("expiry_test", request())
+                .await
+                .unwrap_err()
+                .into_result();
+            let error = failure.structured_content.unwrap();
+            assert_eq!(
+                error.pointer("/error/code"),
+                Some(&json!("not_authenticated"))
+            );
+            assert_eq!(
+                error.pointer("/error/details/status"),
+                Some(&json!(rejected_status.as_u16()))
+            );
+            let message = error
+                .pointer("/error/message")
+                .and_then(Value::as_str)
+                .unwrap();
+            assert!(message.contains("same profile") && message.contains("restart"));
+            assert!(!error.to_string().contains("synthetic-sensitive-session"));
+            assert!(!error.to_string().contains("synthetic-secret"));
+            assert_eq!(calls.load(Ordering::Relaxed), 2);
+            server.abort();
+        }
     }
 
     #[tokio::test]

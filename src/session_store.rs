@@ -508,10 +508,14 @@ mod tests {
             second.load().unwrap_err(),
             StoreError("session_profile_mismatch_or_corrupt")
         );
+        second.save("session=separate-profile-unit-test").unwrap();
+        let second_snapshot = second.load_with_namespace().unwrap();
         first.save("session=refreshed-unit-test").unwrap();
         assert_ne!(first.load_record().unwrap().generation, old_generation);
         assert_eq!(first.load().unwrap(), "session=refreshed-unit-test");
+        assert_eq!(second.load_with_namespace().unwrap(), second_snapshot);
         first.delete().unwrap();
+        assert_eq!(second.load_with_namespace().unwrap(), second_snapshot);
         second.delete().unwrap();
         assert!(first.load().is_err());
         fs::remove_file(root.join("one.lock")).unwrap();

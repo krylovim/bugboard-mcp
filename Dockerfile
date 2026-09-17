@@ -6,7 +6,8 @@ RUN cargo build --release --locked
 
 FROM debian:bookworm-slim
 
-LABEL org.opencontainers.image.source="https://github.com/bapho-bush/bugboard-mcp"
+# Fork packaging changed by krylovim, 2026; original LICENSE remains applicable.
+LABEL org.opencontainers.image.source="https://github.com/krylovim/bugboard-mcp"
 LABEL org.opencontainers.image.description="MCP server for the 1C Bugboard"
 
 RUN apt-get update \

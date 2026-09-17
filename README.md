@@ -1,11 +1,13 @@
 # bugboard-mcp
 
-Fork changes by krylovim (2026): restored legacy search and added explicit
-product-scoped content search. Original license and author notices are retained.
+Fork changes by krylovim (2026): restored legacy search, explicit product-scoped
+content search, a local catalog cache and protected Windows session profiles.
+Original license and author notices are retained.
 
 `bugboard-mcp` gives an MCP client access to projects, versions, bugs, history,
 subscriptions, and votes in the 1C Bugboard. It uses the browser session you
-already have; it does not collect credentials or automate the browser.
+already have. An optional local helper opens a separate browser for user-driven
+login; it never asks the agent to collect passwords or cookies.
 
 The server is unofficial and experimental. Use it with an account that is
 allowed to access the target Bugboard data.
@@ -120,8 +122,14 @@ server caps and changing data limit what can be concluded. Literal search is
 not semantic or morphological search. An empty result does not prove that no
 known bug exists, and a fix version does not establish affected versions.
 
-See [the API and acceptance notes](docs/project-scoped-search.md) for the
-boundary with future catalog caching (#2) and the diagnostic skill (#3).
+See [the API and acceptance notes](docs/project-scoped-search.md),
+[catalog caching](docs/catalog-cache.md), [protected session storage](docs/session-storage.md)
+and the [browser login prototype](docs/browser-login-research.md). The separately
+installed `bugboard-diagnostics` skill owns repository bindings and separates
+product, BSP and platform searches. These additions do not imply full catalog
+coverage or automatic session renewal.
+
+Plugin packaging remains [deferred pending live acceptance](docs/plugin-packaging-decision.md).
 
 ## Development
 
