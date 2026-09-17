@@ -129,6 +129,7 @@ impl Fixture {
             client: Ok(Arc::new(BugboardClient::for_test(&base))),
             tool_router: BugboardServer::tool_router(),
             handles: Arc::new(Mutex::new(HandleStore::default())),
+            catalog: Arc::new(crate::catalog::CatalogCache::new(&base, None, None)),
         };
         Self {
             server,
@@ -341,4 +342,96 @@ fn number_grammar_and_scope_drift_fail_closed() {
 
 fn json_response(value: Value) -> impl axum::response::IntoResponse {
     ([("content-type", "application/json")], value.to_string())
+}
+
+#[tokio::test]
+async fn repeated_catalog_and_exact_resolution_avoid_network_and_force_refresh_is_explicit() {
+    let f = Fixture::new().await;
+    let args = || serde_json::from_value(json!({"query":"Бухгалтерия","limit":1})).unwrap();
+    let first = f.server.project_catalog_value(args()).await.unwrap();
+    let count = f.requests.lock().unwrap().len();
+    let repeat = f.server.project_catalog_value(args()).await.unwrap();
+    assert_eq!(f.requests.lock().unwrap().len(), count);
+    assert_eq!(first["projects"], repeat["projects"]);
+    assert_eq!(repeat["cache"]["source"], "memory");
+    assert_eq!(repeat["coverage"]["complete"], false);
+    assert_eq!(repeat["has_more"], true);
+    f.server
+        .project_catalog_value(
+            serde_json::from_value(json!({"query":"Бухгалтерия","force_refresh":true})).unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(f.requests.lock().unwrap().len(), count + 1);
+    let bp = f
+        .server
+        .search_project(Some("bp3"), None)
+        .await
+        .unwrap()
+        .unwrap();
+    let count = f.requests.lock().unwrap().len();
+    assert_eq!(
+        f.server
+            .search_project(Some("bp3"), None)
+            .await
+            .unwrap()
+            .unwrap(),
+        bp
+    );
+    assert_eq!(f.requests.lock().unwrap().len(), count);
+    // A query cache containing a code does not resolve it as unique: the independent
+    // exact selector still detected two products with the same code above.
+    assert!(
+        f.server
+            .search_project(Some("unknown"), None)
+            .await
+            .is_err()
+    );
+    assert!(
+        f.server
+            .search_project(Some("unknown"), None)
+            .await
+            .is_err()
+    );
+    assert_eq!(f.requests.lock().unwrap().len(), count + 2);
+}
+
+#[tokio::test]
+async fn metadata_only_opt_in_reads_disk_but_default_rehydrates_compatible_handles() {
+    let mut f = Fixture::new().await;
+    let root = tempfile::tempdir().unwrap();
+    let cache = || {
+        Arc::new(crate::catalog::CatalogCache::new(
+            "fixture",
+            Some("a".into()),
+            Some(root.path().into()),
+        ))
+    };
+    f.server.catalog = cache();
+    let first = f
+        .server
+        .project_catalog_value(serde_json::from_value(json!({"query":"Бухгалтерия"})).unwrap())
+        .await
+        .unwrap();
+    assert!(first["projects"][0]["project_handle"].is_string());
+    f.server.catalog = cache();
+    let requests = f.requests.lock().unwrap().len();
+    let metadata = f
+        .server
+        .project_catalog_value(
+            serde_json::from_value(json!({"query":"Бухгалтерия","metadata_only":true})).unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(f.requests.lock().unwrap().len(), requests);
+    assert_eq!(metadata["cache"]["source"], "disk");
+    assert_eq!(metadata["projects"][0]["project_code"], "bp3");
+    assert!(metadata["projects"][0]["project_handle"].is_null());
+    let compatible = f
+        .server
+        .project_catalog_value(serde_json::from_value(json!({"query":"Бухгалтерия"})).unwrap())
+        .await
+        .unwrap();
+    assert_eq!(f.requests.lock().unwrap().len(), requests + 1);
+    assert!(compatible["projects"][0]["project_handle"].is_string());
 }

@@ -1,11 +1,14 @@
 // Copyright 2026 krylovim. Apache-2.0 WITH Commons Clause 1.0; see LICENSE.
-// Read-only acceptance test. Pass an external BUGBOARD_SESSION_ENV and a built
+// Read-only acceptance test. Pass an external BUGBOARD_SESSION_ENV or explicitly
+// select BUGBOARD_SESSION_STORE=dpapi and BUGBOARD_PROFILE, plus a built
 // binary path. Does not read, print, copy or persist the cookie itself.
 const {spawn} = require('node:child_process');
 const {createInterface} = require('node:readline');
 const assert = require('node:assert/strict');
 const path = require('node:path');
-if (!process.env.BUGBOARD_SESSION_ENV) throw new Error('Set external BUGBOARD_SESSION_ENV');
+if (!process.env.BUGBOARD_SESSION_ENV && process.env.BUGBOARD_SESSION_STORE !== 'dpapi') {
+  throw new Error('Set external BUGBOARD_SESSION_ENV or BUGBOARD_SESSION_STORE=dpapi');
+}
 const env = {...process.env};
 delete env.BUGBOARD_COOKIE;
 const child = spawn(path.resolve(process.argv[2] || 'target/debug/bugboard-mcp.exe'), ['--stdio'],

@@ -1,3 +1,4 @@
+// Modified by krylovim, 2026: explicit protected profiles and atomic cache identity snapshot.
 use std::{collections::HashMap, fs, path::PathBuf, sync::Arc};
 
 use serde_json::json;
@@ -17,9 +18,19 @@ impl std::fmt::Debug for SessionConfig {
 }
 
 impl SessionConfig {
-    pub(crate) fn from_env() -> Result<Self, ConfigError> {
+    pub(crate) fn from_env_with_namespace() -> Result<(Self, Option<String>), ConfigError> {
+        if let Some(store) = std::env::var_os("BUGBOARD_SESSION_STORE") {
+            if store != "dpapi" {
+                return Err(ConfigError::ProtectedSession("unknown_session_store"));
+            }
+            let (cookie, generation) = crate::session_store::SessionStore::from_env()
+                .and_then(|store| store.load_with_namespace())
+                .map_err(|error| ConfigError::ProtectedSession(error.0))?;
+            return Self::from_cookie(Some(&cookie)).map(|config| (config, Some(generation)));
+        }
         if std::env::var_os("BUGBOARD_COOKIE").is_some() {
-            return Self::from_cookie(std::env::var("BUGBOARD_COOKIE").ok().as_deref());
+            return Self::from_cookie(std::env::var("BUGBOARD_COOKIE").ok().as_deref())
+                .map(|config| (config, None));
         }
 
         let env_file = std::env::var_os("BUGBOARD_SESSION_ENV")
@@ -31,7 +42,7 @@ impl SessionConfig {
                 source: Arc::new(source),
             }
         })?);
-        Self::from_values(&values)
+        Self::from_values(&values).map(|config| (config, None))
     }
 
     pub(crate) fn from_values(values: &HashMap<String, String>) -> Result<Self, ConfigError> {
@@ -50,6 +61,7 @@ impl SessionConfig {
 
 #[derive(Clone, Debug)]
 pub(crate) enum ConfigError {
+    ProtectedSession(&'static str),
     MissingEnvFilePath,
     MissingCookie,
     ReadEnvFile {
@@ -61,6 +73,11 @@ pub(crate) enum ConfigError {
 impl From<ConfigError> for ToolFailure {
     fn from(error: ConfigError) -> Self {
         match error {
+            ConfigError::ProtectedSession(code) => ToolFailure::new(
+                "protected_session_error",
+                "Could not load the selected protected session. Legacy credentials were not used.",
+                json!({"reason": code}),
+            ),
             ConfigError::MissingEnvFilePath => ToolFailure::new(
                 "config_missing",
                 "Set BUGBOARD_COOKIE or BUGBOARD_SESSION_ENV.",

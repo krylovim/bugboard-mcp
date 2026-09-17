@@ -1,5 +1,5 @@
 // Copyright 2026 krylovim. Apache-2.0 WITH Commons Clause 1.0; see LICENSE.
-// Explicit per-call product context; no persistent catalog or repository binding.
+// Explicit per-call product context and isolated metadata cache; no repository binding.
 use super::*;
 use bugboard::{CatalogProject, SearchBugRow};
 
@@ -11,6 +11,13 @@ pub(super) struct ProjectListParams {
     /// Literal substring of the official title, abbreviation or stable code.
     query: Option<String>,
     limit: Option<u32>,
+    /// Fetch current candidates even when the cache is younger than 24 hours.
+    #[serde(default)]
+    force_refresh: bool,
+    /// Allow reference-free disk metadata (project_handle may be null), including
+    /// explicitly stale candidates when a refresh fails. Prefer stable project_code.
+    #[serde(default)]
+    metadata_only: bool,
 }
 
 #[derive(Clone, Copy, Deserialize, JsonSchema, PartialEq, Eq)]
@@ -28,15 +35,32 @@ impl BugboardServer {
     ) -> Result<Value, ToolFailure> {
         let limit = normalize_limit(params.limit)?;
         let query = optional_nonempty(params.query.as_deref(), "query")?;
-        let client = self.client()?;
-        let parsed = client
-            .execute_dynamic_list(
-                "project_list",
-                bugboard::project_catalog_request(query, None, None, limit + 1)?,
+        let key = query.map_or_else(|| "all".to_owned(), |q| format!("query:{q}"));
+        let snapshot = self
+            .catalog
+            .get(
+                &key,
+                params.force_refresh,
+                !params.metadata_only,
+                || async {
+                    let client = self.client()?;
+                    let parsed = client
+                        .execute_dynamic_list(
+                            "project_list",
+                            bugboard::project_catalog_request(
+                                query,
+                                None,
+                                None,
+                                crate::catalog::PAGE_SIZE,
+                            )?,
+                        )
+                        .await?;
+                    bugboard::decode_catalog_projects(&parsed)
+                        .map_err(|e| ToolFailure::bugboard_changed("project_list", e))
+                },
             )
             .await?;
-        let rows = bugboard::decode_catalog_projects(&parsed)
-            .map_err(|e| ToolFailure::bugboard_changed("project_list", e))?;
+        let rows = snapshot.rows;
         let has_more = rows.len() > limit as usize;
         let projects = rows
             .iter()
@@ -47,15 +71,22 @@ impl BugboardServer {
             json!({"count":projects.len(), "projects":projects, "limit":limit,
             "query":query, "has_more":has_more,
             "coverage": page_coverage(has_more),
+            "cache":snapshot.status,
             "selection":"candidates_only"}),
         )
     }
 
     fn catalog_project_value(&self, p: &CatalogProject) -> Result<Value, ToolFailure> {
+        if p.reference.is_empty() {
+            return Ok(
+                json!({"project_handle":null,"project_code":p.code,"title":p.title,
+                "abbreviation":p.abbreviation,"updated_at":p.updated_at}),
+            );
+        }
         normalize_project_row(self, p)
     }
 
-    // This exact resolver is also the future catalog-cache boundary (#2).
+    // Cache the exact selector, not the first matching entry of a partial page.
     // Never resolve a code from the first page of an unfiltered catalog.
     async fn search_project(
         &self,
@@ -68,25 +99,36 @@ impl BugboardServer {
         if code.is_none() && reference.is_none() {
             return Ok(None);
         }
-        let client = self.client()?;
         // Resolve code independently: adding a handle must not hide duplicate codes.
-        let parsed = client
-            .execute_dynamic_list(
-                "project_resolve",
-                bugboard::project_catalog_request(
-                    None,
-                    code,
-                    if code.is_none() {
-                        reference.as_deref()
-                    } else {
-                        None
-                    },
-                    2,
-                )?,
-            )
-            .await?;
-        let rows = bugboard::decode_catalog_projects(&parsed)
-            .map_err(|e| ToolFailure::bugboard_changed("project_resolve", e))?;
+        // Reference selectors are process-local and are never persisted in keys.
+        let fetch = || async {
+            let client = self.client()?;
+            let parsed = client
+                .execute_dynamic_list(
+                    "project_resolve",
+                    bugboard::project_catalog_request(
+                        None,
+                        code,
+                        if code.is_none() {
+                            reference.as_deref()
+                        } else {
+                            None
+                        },
+                        2,
+                    )?,
+                )
+                .await?;
+            bugboard::decode_catalog_projects(&parsed)
+                .map_err(|e| ToolFailure::bugboard_changed("project_resolve", e))
+        };
+        let rows = if let Some(code) = code {
+            self.catalog
+                .get(&format!("code:{code}"), false, true, fetch)
+                .await?
+                .rows
+        } else {
+            fetch().await?
+        };
         match rows.as_slice() {
             [] => Err(ToolFailure::new(
                 "unknown_project",

@@ -1,9 +1,13 @@
+// Modified by krylovim, 2026: catalog caching and protected local authentication.
+mod auth_cli;
+mod catalog;
 mod client;
 mod config;
 mod errors;
 mod handles;
 mod normalize;
 mod server;
+mod session_store;
 mod write_safety;
 
 use rmcp::{
@@ -22,6 +26,9 @@ type AppResult<T = ()> = Result<T, Box<dyn std::error::Error + Send + Sync>>;
 
 #[tokio::main]
 async fn main() -> AppResult {
+    if let Some(code) = auth_cli::run_if_requested().await {
+        std::process::exit(code);
+    }
     if matches!(transport_mode().as_deref(), Some("stdio")) {
         return run_stdio().await;
     }

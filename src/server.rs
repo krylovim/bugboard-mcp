@@ -1,4 +1,4 @@
-// Modified by krylovim, 2026: explicit project search and safe number resolution.
+// Modified by krylovim, 2026: explicit project search, isolated catalog cache and safe number resolution.
 mod search;
 use search::ProjectListParams;
 
@@ -37,17 +37,30 @@ pub(crate) struct BugboardServer {
     pub(crate) tool_router: ToolRouter<Self>,
     client: Result<Arc<BugboardClient>, ToolFailure>,
     handles: Arc<Mutex<HandleStore>>,
+    catalog: Arc<crate::catalog::CatalogCache>,
 }
 
 impl BugboardServer {
     pub(crate) fn new() -> Self {
+        // Cookie and protected-session namespace are captured from one record.
+        // A concurrent account switch cannot populate its cache with old data.
+        let configuration = SessionConfig::from_env_with_namespace();
+        let namespace = configuration
+            .as_ref()
+            .ok()
+            .and_then(|(_, namespace)| namespace.clone());
         Self {
             tool_router: Self::tool_router(),
-            client: SessionConfig::from_env()
+            client: configuration
+                .map(|(config, _)| config)
                 .map_err(ToolFailure::from)
                 .and_then(BugboardClient::new)
                 .map(Arc::new),
             handles: Arc::new(Mutex::new(HandleStore::default())),
+            catalog: Arc::new(crate::catalog::CatalogCache::from_env(
+                bugboard::BUGBOARD_BASE_URL,
+                namespace,
+            )),
         }
     }
 
@@ -92,7 +105,7 @@ impl BugboardServer {
 
     #[tool(
         name = "project_list",
-        description = "Find products by literal query over code, title or abbreviation. Returns stable project_code and session-local project_handle; multiple matches are candidates, never an automatic selection. First page only."
+        description = "Find products by literal query over code, title or abbreviation. Cached for 24 hours; force_refresh bypasses TTL. metadata_only=true allows disk/offline candidates with null project_handle; default preserves live session handles. Inspect cache age/stale and coverage: first page is partial. Multiple matches are candidates, never an automatic selection."
     )]
     async fn project_list(
         &self,
@@ -320,7 +333,7 @@ impl ServerHandler for BugboardServer {
                     .with_title("1C Bugboard MCP Server"),
             )
             .with_instructions(
-                "1C bugboard tools with verified idempotent writes. Set BUGBOARD_COOKIE directly or use BUGBOARD_SESSION_ENV.",
+                "1C bugboard tools with verified idempotent writes. Use a protected DPAPI profile or legacy BUGBOARD_COOKIE/BUGBOARD_SESSION_ENV. Pass project_code per search; catalog coverage is partial.",
             )
     }
 }
@@ -343,6 +356,15 @@ impl BugboardServer {
 
         Ok(json!({
             "authenticated": authenticated,
+            "profile": if std::env::var_os("BUGBOARD_SESSION_STORE").is_some()
+                || std::env::var_os("BUGBOARD_PROFILE").is_some() {
+                crate::session_store::profile_from_env().ok()
+            } else { None },
+            "session_source": if std::env::var_os("BUGBOARD_SESSION_STORE").is_some() {
+                "windows_current_user_dpapi"
+            } else if std::env::var_os("BUGBOARD_COOKIE").is_some() {
+                "environment"
+            } else { "env_file" },
             "authentication_method": parsed
                 .get("authenticationMethod")
                 .and_then(Value::as_str),
