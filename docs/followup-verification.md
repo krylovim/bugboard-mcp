@@ -21,7 +21,7 @@ Upstream PR #2 and its source branch are unchanged.
 ## Checks completed
 
 On Windows with Rust 1.96.0 (GNU, `-C link-self-contained=yes`): formatting,
-examples check, Clippy with warnings denied, 112 workspace/all-target tests,
+examples check, Clippy with warnings denied, 113 workspace/all-target tests,
 one doctest, build and verified wire-crate packaging passed. Cargo-deny passed
 advisories, licenses, bans and sources with the repository policy unchanged.
 
@@ -52,7 +52,11 @@ fresh login, upstream expiry/revocation or decryption under another Windows
 identity. Those observations are reported separately from deterministic tests.
 Cache coverage remains partial and does not promise pagination or completeness.
 
-Remote CI was dispatched separately; its result is recorded below when complete.
+Remote [CI on core 1287b94](https://github.com/krylovim/bugboard-mcp/actions/runs/35284315337)
+passed Ubuntu and Windows verification plus Docker build. No image publication
+is claimed: workflow dispatch skips publication. [Final code dbea3d4 CI](https://github.com/krylovim/bugboard-mcp/actions/runs/35284775332)
+also passed all three jobs. Automatic push runs did not appear; manual dispatch
+was used. Subsequent checkpoint changes affect documentation/comments only.
 
 ## Real browser and installed runtime
 
@@ -61,9 +65,12 @@ was saved only after live authentication. After browser closure a new process
 using only DPAPI passed all nine search groups from the common runtime folder.
 The helper has twelve passing tests, including installed-browser lifecycle.
 
-Installed executable: `runtime/1287b94c76e6/bugboard-mcp.exe`, commit
-`1287b94c76e6f9b417fc811263bc8c5fbc5918a7`, SHA-256
-`78461DB14BD855C98F46ADD170D9C0EDAE648EBADCB547B5351CFAF1440E9C07`.
+Installed executable: `runtime/dbea3d47f145/bugboard-mcp.exe`, commit
+`dbea3d47f145570cb9da4ea572b2ce0b7a59dd94`, SHA-256
+`72A3DB3B6FFD101F5FB8990A505DD0AD4A66EA4BC31760949CE4EA2A27DB4069`.
+This final build also passed all nine live groups. Two initial attempts encountered
+HTTPS transport failures; both old/new CLI status checks remained authenticated,
+and the subsequent complete search run passed without changing credentials.
 The shared configuration selects `BUGBOARD_SESSION_STORE=dpapi` and profile
 `work`. Its full parsed TOML matches the pre-switch backup except for the
 intended Bugboard executable and auth settings; six disabled write tools remain.
@@ -98,3 +105,19 @@ Local evidence is in ignored `target/skill-pilot/binding-pilot-results.json` and
 `live-pilot-results.json`; maintained findings are in the skill's
 `references/validation.md`. Demo exports are real source inputs, not evidence
 of deployment to production repositories.
+
+## Remaining acceptance and issue disposition
+
+Issues #1 and #2 meet their documented automated/live criteria. The #3 real demo
+pilot passed; ambiguity without metadata was assessed as a control scenario,
+not a live user dialogue. #4 has a working Chrome prototype and a documented
+supported-API decision, with explicit expiry/revocation limits. #5 implementation
+and migration are deployed, but full live acceptance remains open for natural
+expiry/re-login, distinct real accounts and another Windows identity. Synthetic
+rejection-after-success and profile-isolation regressions passed. #6 remains
+intentionally deferred; no plugin installation or Docker publication is claimed.
+
+No user input is required for the current working installation. Existing tasks
+must restart their MCP process (reopen Codex if no per-server restart is exposed)
+to use the updated schema and credentials. A future expired session is renewed
+through the shared `login.ps1 -Profile work` helper, then an MCP restart.

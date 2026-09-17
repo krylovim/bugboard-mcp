@@ -1,3 +1,4 @@
+# Modified by krylovim, 2026: publish images under the current fork's namespace.
 name: CI
 
 on:

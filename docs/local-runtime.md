@@ -3,7 +3,7 @@
 Initial deployment checkpoint by krylovim, 2026-09-17. Supersedes the pending
 deployment step in the earlier issue #1 verification report.
 
-**Updated 2026-09-18:** the active installation now uses runtime `1287b94c76e6`,
+**Updated 2026-09-18:** the active installation now uses runtime `dbea3d47f145`,
 Windows DPAPI profile `work` and the shared Chrome `login.ps1` helper. See the
 [current acceptance and migration checkpoint](followup-verification.md).
 The history below records the first deployment; the installed v2 rollback
