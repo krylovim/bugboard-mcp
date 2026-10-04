@@ -1,24 +1,32 @@
 # Issue #6: packaging decision
 
-Assessment by krylovim, 2026-09-18. License: Apache-2.0 + Commons Clause 1.0;
+Assessment by krylovim, 2026-09-18; implementation authorized 2026-10-04.
+License: Apache-2.0 + Commons Clause 1.0;
 the original license and author notices remain applicable.
 
-Keep this issue in backlog until the remaining live acceptance of #3–#5 is
-complete. The current installation already separates the versioned executable,
-profile/session data, and installed diagnostic skill. Creating a second MCP
-registration now would add a conflicting connection without resolving the
-remaining renewal acceptance. Fresh Chrome login and restart already passed;
-packaging adds little immediate value to this working standalone installation.
+The initial decision was to defer packaging. On 2026-10-04 the user explicitly
+requested completion of issue #6. The saved profile was rejected by Bugboard;
+the user repeated Chrome login, the helper verified and saved it, and a new
+MCP process passed all nine search acceptance groups. This exercises renewal
+of a previously working session after server rejection. It does not establish
+whether rejection resulted from elapsed lifetime or server-side revocation.
 
-## Proposed install/update boundary
+The implementation uses a local Windows package with a committed skill snapshot,
+the previously verified executable, browser helper and pinned dependencies.
+It installs versioned code under the common application-data root; user data
+stays outside code and plugin caches. See [installation](../plugin/README.md)
+and the [current verification checkpoint](plugin-verification.md).
+
+## Install/update boundary
 
 - Package the versioned MCP, local authentication helper and a tested snapshot
   of `bugboard-diagnostics` from the practical-skills repository. Record the
   skill source commit and supported MCP schema in the package.
 - Use the supported `.codex-plugin/plugin.json`, `skills/`, `scripts/` and
-  companion `.mcp.json` layout when implementing packaging. Validate against
-  the installed plugin-creator schema at that time; a layout assessment is
-  not an installation or update acceptance test.
+  companion `.mcp.json` compatibility layout, checked against current host CLI
+  and installed examples. It remains documented in
+  [official packaging guidance](https://developers.openai.com/plugins/build/plugins).
+  A separate local marketplace supplies the prepared package.
 - Keep profile credentials, catalog cache and installation backups in the
   user's application-data directory, outside plugin caches. Keep repository
   `.bugboard.json` files in their existing repositories.
@@ -30,12 +38,14 @@ packaging adds little immediate value to this working standalone installation.
 - Include LICENSE and retained author notices, mark fork changes, and preserve
   a NOTICE if one is introduced upstream. Do not label this fork pure Apache-2.0.
 
-## Acceptance still required
+## Acceptance
 
 A disposable clean installation, update preserving bindings and sessions,
 search in two products, interactive login and renewal, absence of duplicate
 MCP processes, and rollback to a compatible executable/skill combination.
-The existing standalone installation remains the supported route meanwhile.
+The standalone installation remains available as a reversible fallback.
 
-This follows the issue's explicit option to defer packaging when its current
-value is small; no marketplace entry or plugin registration was created.
+The distributable ZIP is currently local-use: the skill source repository has
+no independent public redistribution license. Source packaging tools are kept
+in this fork, while the ZIP and private skill snapshot are excluded from Git.
+No public marketplace listing or public binary/skill release is implied.

@@ -131,6 +131,25 @@ coverage or automatic session renewal.
 
 Plugin packaging remains [deferred pending live acceptance](docs/plugin-packaging-decision.md).
 
+## Windows Codex plugin
+
+The local package combines the MCP executable, a pinned diagnostic skill,
+Chrome login and reversible installation. Sessions and catalog data stay in
+the user's application-data directory. See [plugin installation](plugin/README.md)
+and [acceptance results](docs/plugin-verification.md).
+
+Build a package using an explicitly verified binary and a committed skill source:
+
+```powershell
+python scripts/build-plugin.py --binary C:\verified\bugboard-mcp.exe --binary-commit FULL_COMMIT_SHA --skill-repo C:\sources\skills --output target\bugboard-plugin --zip target\bugboard-plugin.zip
+```
+
+The build requires Git, Python 3.11+, Node/npm and registry access for the
+pinned Playwright dependency. It copies only reviewed skill files and includes
+source provenance, file hashes and license notices. Build outputs stay outside
+Git. The current private skill snapshot is for local use; public ZIP distribution
+requires resolving its separate licensing first.
+
 ## Development
 
 Run the complete local and CI check:

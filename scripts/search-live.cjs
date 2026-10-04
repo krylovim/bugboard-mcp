@@ -11,7 +11,10 @@ if (!process.env.BUGBOARD_SESSION_ENV && process.env.BUGBOARD_SESSION_STORE !== 
 }
 const env = {...process.env};
 delete env.BUGBOARD_COOKIE;
-const child = spawn(path.resolve(process.argv[2] || 'target/debug/bugboard-mcp.exe'), ['--stdio'],
+// Optional explicit launcher arguments allow testing the packaged PowerShell
+// entry point through the same wire-level acceptance as the direct executable.
+const launchArgs = process.argv.length > 3 ? process.argv.slice(3) : ['--stdio'];
+const child = spawn(path.resolve(process.argv[2] || 'target/debug/bugboard-mcp.exe'), launchArgs,
   {env, stdio:['pipe','pipe','pipe'], windowsHide:true});
 child.stderr.resume();
 const lines = createInterface({input:child.stdout});

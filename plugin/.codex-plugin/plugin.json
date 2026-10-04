@@ -1,0 +1,8 @@
+{
+  "name": "bugboard",
+  "version": "0.2.0",
+  "description": "Known 1C issues by product, BSP and platform, with local Windows session profiles.",
+  "author": { "name": "krylovim" },
+  "skills": "./skills",
+  "mcpServers": "./.mcp.json"
+}

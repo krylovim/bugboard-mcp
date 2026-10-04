@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "bugboard": {
+      "command": "powershell.exe",
+      "args": ["-NoLogo", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "./scripts/launch.ps1"],
+      "cwd": ".",
+      "env_vars": ["USERPROFILE", "LOCALAPPDATA", "APPDATA", "SystemRoot", "TEMP", "TMP", "PATH"],
+      "startup_timeout_sec": 30,
+      "tool_timeout_sec": 120,
+      "disabled_tools": ["bug_subscribe", "bug_unsubscribe", "bug_vote", "bug_unvote", "project_subscribe", "project_unsubscribe"]
+    }
+  }
+}

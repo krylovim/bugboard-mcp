@@ -1,4 +1,4 @@
-# Modified by krylovim, 2026: publish images under the current fork's namespace.
+# Modified by krylovim, 2026: fork publishing and Windows plugin acceptance.
 name: CI
 
 on:
@@ -23,8 +23,24 @@ jobs:
       - run: mise install
       - run: mise run verify
 
+  plugin:
+    name: Windows plugin lifecycle
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - run: python scripts/test-plugin-package.py
+      - run: python scripts/test-configure-plugin.py
+      - run: python scripts/test-register-plugin.py
+      - run: powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File scripts/plugin-lifecycle.test.ps1
+      - run: powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File scripts/plugin-stdio.test.ps1
+      - run: node --test scripts/browser-login.test.cjs
+
   docker:
     name: docker image
+    needs: [verify, plugin]
     runs-on: ubuntu-latest
     permissions:
       contents: read

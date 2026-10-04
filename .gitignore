@@ -1,6 +1,10 @@
 # Rust build artifacts
 /target/
 
+# Python packaging/verification helpers (added by krylovim, 2026)
+__pycache__/
+*.py[cod]
+
 # Local session files
 .env*
 *.env
