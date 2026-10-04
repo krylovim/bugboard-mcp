@@ -147,11 +147,12 @@ slow SSO navigation must not immediately close the window, and one unsupported
 ancillary cookie must not reject an otherwise valid authenticated header. No
 cookie values were inspected or printed to diagnose these failures.
 
-Still unverified: natural expiry or upstream revocation followed by a user
-re-login, and decryption under a different Windows identity. Existing working
-sessions were not revoked to manufacture an expiry test. Rejection/cancellation,
-record preservation and import-based renewal were tested independently; those
-tests are not reported as observation of real session expiry.
+On 2026-10-04 the previously saved session returned unauthenticated. The user
+repeated Chrome login; validated replacement and search in a new MCP process
+passed. This is real recovery after server rejection; its expiry/revocation
+cause is unknown. See the [current acceptance report](plugin-verification.md).
+Decryption under a different Windows identity is still unverified. Working
+sessions were not revoked to manufacture an expiry test.
 
 The installed shared helper is `%LOCALAPPDATA%/bugboard-mcp/login.ps1` (Chrome
 by default). It uses its own pinned Playwright installation, not Codex's internal

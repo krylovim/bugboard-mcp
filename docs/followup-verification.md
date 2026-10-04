@@ -1,5 +1,13 @@
 # Follow-up issues: verification checkpoint
 
+**Update, 2026-10-04:** real server rejection followed by fresh Chrome login,
+validated DPAPI replacement and search in a new process has now passed. Issue
+#6's Windows plugin is implemented, installed and enabled. See the
+[current verification and activation checkpoint](plugin-verification.md).
+The remaining sections record the September state; their pending items are
+superseded by that checkpoint. Another Windows identity and two distinct live
+1C accounts remain outside the tested scope.
+
 Changes by krylovim, 2026-09-18. Apache-2.0 + Commons Clause 1.0 and original
 author notices are retained. Development branch: `codex/catalog-auth-followup`.
 Upstream PR #2 and its source branch are unchanged.

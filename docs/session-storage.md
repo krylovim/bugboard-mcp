@@ -6,7 +6,9 @@ Issue #5 foundations: a local CLI imports an authenticated session, validates it
 Bugboard, then persists only current-user Windows DPAPI ciphertext. This does not implement
 SSO or automate MFA. The [browser-login research](browser-login-research.md) supplies a
 separate interactive helper. A real Chrome login and search after restart passed
-on 2026-09-18; see the [verification checkpoint](followup-verification.md).
+on 2026-09-18. On 2026-10-04 the saved session was rejected by the server;
+fresh Chrome login, validated replacement and search after restart passed.
+See the [current verification checkpoint](plugin-verification.md).
 
 ## Local commands
 
@@ -122,9 +124,10 @@ to distinguish an auth failure from a changed server response. A cached metadata
 product listing is not proof of live authentication.
 
 Profile isolation tests additionally preserve a second independent profile across
-refresh and deletion of the first. Two distinct real Bugboard accounts used concurrently,
-natural expiry followed by re-login, and decrypt attempts under a different Windows
-user/machine have not been exercised. Same-user roundtrip and corrupt-blob rejection
+refresh and deletion of the first. Two distinct real Bugboard accounts used concurrently
+and decrypt attempts under a different Windows user/machine have not been exercised.
+Real rejection and re-login were observed on 2026-10-04, but the exact server-side
+expiry/revocation cause is unknown. Same-user roundtrip and corrupt-blob rejection
 are verified; the cross-user guarantee otherwise relies on the documented DPAPI mode.
 
 Microsoft contracts checked during implementation:

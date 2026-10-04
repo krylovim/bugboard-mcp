@@ -3,9 +3,16 @@
 Initial deployment checkpoint by krylovim, 2026-09-17. Supersedes the pending
 deployment step in the earlier issue #1 verification report.
 
-**Updated 2026-09-18:** the active installation now uses runtime `dbea3d47f145`,
+**Updated 2026-10-04:** plugin `bugboard@bugboard-local` version `0.2.0` is
+installed and enabled. Its shared release `0.2.0-dd190c8f168a` uses the verified
+runtime `dbea3d47f145` and DPAPI profile `work`. The manual MCP entry is disabled
+and retained for rollback. Live launcher and installed-cache checks passed;
+already-open Codex tasks need an app restart. See the
+[current plugin acceptance and recovery instructions](plugin-verification.md).
+
+**Historical checkpoint, 2026-09-18:** the installation used runtime `dbea3d47f145`,
 Windows DPAPI profile `work` and the shared Chrome `login.ps1` helper. See the
-[current acceptance and migration checkpoint](followup-verification.md).
+[September acceptance and migration checkpoint](followup-verification.md).
 The history below records the first deployment; the installed v2 rollback
 helper now switches both executable and compatible authorization, with db9ac11
 as the previous version. The legacy env is retained only for that rollback.
