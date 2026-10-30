@@ -1,88 +1,62 @@
-# Shared local runtime
+# Windows runtime operations
 
-Initial deployment checkpoint by krylovim, 2026-09-17. Supersedes the pending
-deployment step in the earlier issue #1 verification report.
+Updated by krylovim, 2026-10-30. Apache-2.0 + Commons Clause 1.0 and original
+notices apply. The user reports this installation is in production.
 
-**Updated 2026-10-04:** plugin `bugboard@bugboard-local` version `0.2.0` is
-installed and enabled. Its shared release `0.2.0-dd190c8f168a` uses the verified
-runtime `dbea3d47f145` and DPAPI profile `work`. The manual MCP entry is disabled
-and retained for rollback. Live launcher and installed-cache checks passed;
-already-open Codex tasks need an app restart. See the
-[current plugin acceptance and recovery instructions](plugin-verification.md).
+## Active installation
 
-**Historical checkpoint, 2026-09-18:** the installation used runtime `dbea3d47f145`,
-Windows DPAPI profile `work` and the shared Chrome `login.ps1` helper. See the
-[September acceptance and migration checkpoint](followup-verification.md).
-The history below records the first deployment; the installed v2 rollback
-helper now switches both executable and compatible authorization, with db9ac11
-as the previous version. The legacy env is retained only for that rollback.
+Plugin `bugboard@bugboard-local` version `0.2.0` is enabled. Its release
+`0.2.0-dd190c8f168a` contains runtime `dbea3d47f145` and uses DPAPI profile
+`work`. The manual `mcp_servers.bugboard` entry is disabled and retained as a
+standalone fallback. Six write tools remain disabled.
 
-Fork `main` was fast-forwarded to `db9ac110eb8e40b499ddfcf508d0065052b15659`,
-including the inherited text-search fix exactly once. Upstream PR #2 and its
-source branch were not changed by this merge.
-
-The user installation now lives outside chat/project folders:
+Code and user data live outside this repository:
 
 ```text
 %LOCALAPPDATA%/bugboard-mcp/
-  runtime/db9ac110eb8e/bugboard-mcp.exe
-  runtime/e5b9ff289881/bugboard-mcp.exe  (independent rollback)
-  session/bugboard.env
-  backups/
-  installation.json
-  rollback-runtime.ps1
-  LICENSE
-  README.md
+  plugin-installation.json          active and previous release selectors
+  plugin-releases/<release-id>/     immutable executable, skill and login helper
+  protected-sessions/               DPAPI-protected profiles
+  backups/                         private configuration backups
+  runtime/                         retained standalone runtimes
+  installation.json                standalone installation/rollback metadata
 ```
 
-Codex's existing `mcp_servers.bugboard` entry points to the first binary and
-the shared session file. Only `command` and `BUGBOARD_SESSION_ENV` changed;
-stdio args, timeouts and the six disabled write tools were preserved. A backup
-of the original config is stored in the private installation directory.
+Catalog cache namespaces are also outside the worktree; see
+[catalog storage](catalog-cache.md). Repository product bindings remain in each
+consumer repository. Codex's plugin cache is a separate installed copy, not the
+source of session data. Do not remove the shared installation or its retained
+rollback resources while cleaning a development worktree.
 
-The session was copied without printing its contents. Windows ACL grants
-access to the installing user and SYSTEM only; this is not DPAPI encryption
-or protection from other processes of the same user. The prior task folder
-is retained as a safety copy but is no longer required by configured launches.
+## Login and recovery
 
-## Verification
+Run the active release's `scripts/login.ps1` from a local terminal. It opens
+Chrome, validates the authenticated session and saves it under the selected
+profile. Enter credentials only in the browser. See the [login procedure](browser-login-research.md).
+Restart the MCP connection after renewing a session so a new process loads it.
+If no per-server restart is available, close and reopen Codex.
 
-- Runtime SHA-256: `27138FDC32D415776C726F25FA6EEAB819A27A6153F4E4405181CF3B819EEE92`.
-- Copied session equality checked without exposing the value or its hash.
-- All 9 groups in `scripts/search-live.cjs` passed using the shared paths.
-- An independent stdio process launched with the shared directory as cwd
-  exposed `project_code`/`mode` and queried the live catalog successfully.
-- Separate BP, BSP, technology-platform and mobile-platform searches returned
-  only the requested project; see the diagnostic skill's validation notes.
-- `codex mcp get bugboard` confirms the new paths and preserved disabled tools.
-- Rollback and return were tested against an isolated configuration, including
-  preservation of unrelated settings and the session path.
+For a code update, run the new package's `scripts/install.ps1`, verify its
+launcher, then run `scripts/register-plugin.py`. For rollback, use
+`scripts/rollback.ps1`; refresh registration if the skill snapshot changed.
+The launcher rejects a registered skill that differs from the active bundle.
+See [installation and rollback](../plugin/README.md) and the
+[verified release baseline](plugin-verification.md).
 
-Open tasks still holding an older MCP process need a restart. If the app does
-not expose a per-server restart, close and reopen Codex. Processes were not
-force-killed during migration. A new
-configuration entry does not retroactively replace the tool schema in an
-already running task. See the [official MCP setup documentation](https://learn.chatgpt.com/docs/extend/mcp?surface=cli).
+To restore the retained standalone provider, use `scripts/configure-plugin.py`
+with positional mode `standalone`, the intended `--config` file and the shared
+private `--backup-dir`. This switches the two providers together. Restart MCP
+afterward. Do not enable both providers separately.
 
-## Rollback
+## Development cleanup
 
-The installed helper switches only the Bugboard executable, preserves the
-shared session and unrelated config, checks the executable's hash and makes
-an atomic configuration backup:
+The repository contains source, regression tests, build/install tooling and
+current operational/API documentation. Local `target/` contents are disposable:
+compiler caches, package copies, probes and temporary demo database exports.
+Python `__pycache__/` directories are also disposable. Rebuild packages with
+`scripts/build-plugin.py`; production launch does not depend on those outputs.
 
-```powershell
-& "$env:LOCALAPPDATA/bugboard-mcp/rollback-runtime.ps1" -Version Previous
-# To return to the scoped-search build:
-& "$env:LOCALAPPDATA/bugboard-mcp/rollback-runtime.ps1" -Version Current
-```
-
-Restart Bugboard MCP in open tasks after either switch. These are manual
-recovery commands, not automatic fallback on transport failures.
-
-## Diagnostic skill
-
-`bugboard-diagnostics` is maintained in the user's practical-skills repository
-and installed via `~/.codex/skills/bugboard-diagnostics`. It resolves a product
-from repository metadata, keeps local bindings, and explicitly separates
-product, BSP and platform search hypotheses. This does not implement the MCP
-catalog cache from issue #2 or the authentication work from issues #4/#5.
+On 2026-10-30 the installed release and Codex cache passed all 203 manifest file
+checks before cleanup. No new live Bugboard query was needed for documentation
+and artifact cleanup; the last recorded live acceptance is dated 2026-10-04.
+Historical issue reports and migration drafts remain recoverable in Git history.

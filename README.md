@@ -9,7 +9,7 @@ subscriptions, and votes in the 1C Bugboard. It uses the browser session you
 already have. An optional local helper opens a separate browser for user-driven
 login; it never asks the agent to collect passwords or cookies.
 
-The server is unofficial and experimental. Use it with an account that is
+The server is unofficial. Use it with an account that is
 allowed to access the target Bugboard data.
 
 ## What it does
@@ -26,6 +26,11 @@ The default transport is Streamable HTTP at `http://127.0.0.1:8000/mcp`. For
 local integrations and smoke checks, use stdio instead.
 
 ## Run it
+
+For the maintained Windows Codex installation, use the
+[plugin instructions](plugin/README.md) and [operations guide](docs/local-runtime.md).
+Browser login saves a validated session in Windows DPAPI; no cookie needs to be
+copied into chat. The standalone commands below remain supported.
 
 Install the pinned toolchain:
 
@@ -124,12 +129,10 @@ known bug exists, and a fix version does not establish affected versions.
 
 See [the API and acceptance notes](docs/project-scoped-search.md),
 [catalog caching](docs/catalog-cache.md), [protected session storage](docs/session-storage.md)
-and the [browser login prototype](docs/browser-login-research.md). The separately
-installed `bugboard-diagnostics` skill owns repository bindings and separates
+and [browser login](docs/browser-login-research.md). The
+`bugboard-diagnostics` skill bundled with the plugin owns repository bindings and separates
 product, BSP and platform searches. These additions do not imply full catalog
 coverage or automatic session renewal.
-
-Plugin packaging remains [deferred pending live acceptance](docs/plugin-packaging-decision.md).
 
 ## Windows Codex plugin
 
@@ -149,6 +152,10 @@ pinned Playwright dependency. It copies only reviewed skill files and includes
 source provenance, file hashes and license notices. Build outputs stay outside
 Git. The current private skill snapshot is for local use; public ZIP distribution
 requires resolving its separate licensing first.
+
+Local `target/` outputs, pilot database exports and Python bytecode caches are
+disposable development artifacts. The installed release, sessions and rollback
+data live outside the worktree; see [storage boundaries](docs/local-runtime.md).
 
 ## Development
 
@@ -172,12 +179,12 @@ authentication. Build it with:
 mise run docker:build
 ```
 
-Pushes to `main` publish `ghcr.io/bapho-bush/bugboard-mcp:latest` and an
-immutable Git commit tag. While the repository is private, pull it with a
-GitHub token that has `read:packages`:
+Successful pushes to this fork's `main` publish `ghcr.io/krylovim/bugboard-mcp:latest`
+and an immutable Git commit tag after verification. If the package is private,
+pull it with a GitHub token that has `read:packages`:
 
 ```sh
-docker pull ghcr.io/bapho-bush/bugboard-mcp:latest
+docker pull ghcr.io/krylovim/bugboard-mcp:latest
 ```
 
 Run HTTP MCP for Codex:
@@ -186,7 +193,7 @@ Run HTTP MCP for Codex:
 docker run --rm -d --name bugboard-mcp `
   -p 127.0.0.1:18080:8000 `
   -e "BUGBOARD_COOKIE=$env:BUGBOARD_COOKIE" `
-  ghcr.io/bapho-bush/bugboard-mcp:latest
+  ghcr.io/krylovim/bugboard-mcp:latest
 ```
 
 Configure Codex with `url = "http://127.0.0.1:18080/mcp"`. Do not use
@@ -199,7 +206,7 @@ Run stdio instead by overriding the transport:
 docker run --rm -i `
   -e "BUGBOARD_MCP_TRANSPORT=stdio" `
   -e "BUGBOARD_COOKIE=$env:BUGBOARD_COOKIE" `
-  ghcr.io/bapho-bush/bugboard-mcp:latest
+  ghcr.io/krylovim/bugboard-mcp:latest
 ```
 
 An external session file remains supported for either transport when mounting
@@ -210,7 +217,7 @@ docker run --rm -d --name bugboard-mcp `
   -p 127.0.0.1:18080:8000 `
   --mount "type=bind,src=C:\path\outside\repo\bugboard.env,dst=/run/secrets/bugboard.env,readonly" `
   -e BUGBOARD_SESSION_ENV=/run/secrets/bugboard.env `
-  ghcr.io/bapho-bush/bugboard-mcp:latest
+  ghcr.io/krylovim/bugboard-mcp:latest
 ```
 
 ## Security

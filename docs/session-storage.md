@@ -2,9 +2,9 @@
 
 Added by krylovim, 2026. Apache-2.0 + Commons Clause 1.0; existing notices apply.
 
-Issue #5 foundations: a local CLI imports an authenticated session, validates it against
+The local CLI imports an authenticated session, validates it against
 Bugboard, then persists only current-user Windows DPAPI ciphertext. This does not implement
-SSO or automate MFA. The [browser-login research](browser-login-research.md) supplies a
+SSO or automate MFA. The [browser-login helper](browser-login-research.md) supplies a
 separate interactive helper. A real Chrome login and search after restart passed
 on 2026-09-18. On 2026-10-04 the saved session was rejected by the server;
 fresh Chrome login, validated replacement and search after restart passed.

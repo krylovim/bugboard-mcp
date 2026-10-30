@@ -1,17 +1,21 @@
-# Windows plugin verification, 2026-10-04
+# Plugin 0.2.0 acceptance baseline
 
 Changes by krylovim. Apache-2.0 + Commons Clause 1.0 and original notices apply.
 
+Acceptance below was performed on 2026-10-04. Current operating instructions
+are in [Windows runtime operations](local-runtime.md); these dated results do
+not imply that the live session has been rechecked on every subsequent day.
+
 ## Scope and sources
 
-Issue #6 packages the existing verified Windows MCP (`dbea3d47f145570cb9da4ea572b2ce0b7a59dd94`)
+Plugin 0.2.0 packages the verified Windows MCP (`dbea3d47f145570cb9da4ea572b2ce0b7a59dd94`)
 with Chrome login, pinned Playwright 1.62.1 and a committed diagnostic skill.
 The private skill source is recorded in each bundle's `skill-provenance.json`;
 the package is for the owner's local use, not a public binary/skill release.
 The source packaging tools and tests are publishable parts of this fork.
 
 The [official plugin documentation](https://developers.openai.com/plugins/build/plugins)
-still supports the compatibility manifest used here. Installed local examples
+supported the compatibility manifest at acceptance time. Installed local examples
 and `codex plugin --help` were checked on this host; registration uses the
 supported CLI, not hand-created plugin cache records. Active runtime state and
 data live outside Codex's disposable plugin cache.
@@ -30,8 +34,6 @@ data live outside Codex's disposable plugin cache.
   manifest/path/link refusal, current-user/SYSTEM ACL and skill/runtime mismatch.
 - A native executable probe verifies UTF-8 Cyrillic/emoji JSON in both directions,
   continuous stdin, no extra transport output and exit-code forwarding.
-- The complete 203-file prototype manifest verified in 1.874 seconds under
-  Windows PowerShell 5.1; this is an observation on this host, not a time guarantee.
 
 The first live launcher test exposed an inherited PowerShell 7 `PSModulePath`
 that hid `Get-FileHash` from Windows PowerShell 5.1 when launched by Node.
@@ -81,25 +83,41 @@ legacy calls. Supported Codex CLI registration then completed successfully.
 - Runtime source: `dbea3d47f145570cb9da4ea572b2ce0b7a59dd94`; executable SHA-256:
   `72a3db3b6ffd101f5fb8990a505dd0ad4a66ea4bc31760949ce4ea2a27db4069`.
 - Diagnostic skill snapshot: `87224d88eb3058487057546b8a6eff7eaa4ca21f`.
-- Local archive: `target/bugboard-plugin-0.2.0-final-windows.zip`; no public ZIP
-  release, since the private skill has no independent redistribution grant.
+- No public ZIP release: the private skill has no independent redistribution
+  grant. Disposable local ZIPs and unpacked build copies were removed during
+  worktree cleanup; the installed release retains its manifest and provenance.
 
 All 203 files in the actual Codex plugin cache matched the installed manifest.
 A fresh MCP launched from that cache initialized successfully, reported live
 authentication and found product `bp3`. The local marketplace points at the
 shared release, not at a previous task folder or the build output.
 
-The parsed user configuration differs from its pre-activation backup only at
+At activation, the parsed user configuration differed from its backup only at
 `marketplaces.bugboard-local`, `mcp_servers.bugboard.enabled` and
 `plugins."bugboard@bugboard-local"`. The manual provider is disabled; the plugin
 is enabled. Six disabled write tools are retained in both registrations.
 Unrelated settings were verified unchanged. Old runtime files, profiles,
 caches, task folders and repository bindings were retained.
 
-The existing Codex task still holds its original MCP process. Restart Codex to
-load the plugin in already-open tasks; this report verifies registration and
-the installed transport independently, not a post-restart desktop session.
-No other running task was interrupted to force the migration.
+Registration and the installed transport were verified independently; no
+other running task was interrupted to force migration. Restart instructions
+apply after a future update or session renewal, not as a pending deployment step.
+
+## Catalog and diagnostic skill acceptance
+
+The underlying runtime passed six live groups covering verified env-to-DPAPI
+import, rejected/cancelled input preserving the record, corrupt-blob refusal,
+memory/disk catalog access after restart, BP/ERP scoped search and cache
+generation isolation after credential renewal. Disposable profiles were removed.
+
+The diagnostic skill pilot used real demo XML exports from BP 3.0.203.24 and
+Trade 11.5.27.75. Metadata resolved `bp3` and `trade11` without selecting the
+first catalog candidate. Nine binding checks covered first binding, alternating
+repositories, version-only changes, changed identity and duplicate ambiguity.
+Live BP→Trade→BP searches stayed in the selected projects. These observations
+do not establish bug applicability to any particular production release.
+Temporary exports and pilot traces were removed during worktree cleanup;
+the maintained skill source and automated regression tests remain available.
 
 ## Recovery and data retention
 
